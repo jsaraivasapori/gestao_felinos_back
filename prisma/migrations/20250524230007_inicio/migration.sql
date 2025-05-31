@@ -7,7 +7,7 @@ CREATE TABLE "Felinos" (
     "nome" VARCHAR(50) NOT NULL,
     "idade" SMALLINT NOT NULL,
     "raca" "Raca" NOT NULL,
-    "dataResgte" DATE NOT NULL,
+    "dataResgate" DATE NOT NULL,
     "dataAdocao" DATE NOT NULL,
     "fiv" BOOLEAN NOT NULL,
     "felv" BOOLEAN NOT NULL,
