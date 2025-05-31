@@ -15,17 +15,16 @@ datasource db {
 }
 
 model Felinos {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nome        String   @db.VarChar(50)
-  idade       Int      @db.SmallInt
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome        String  @db.VarChar(50)
+  idade       Int     @db.SmallInt
   raca        Raca
-  dataResgate DateTime @db.Date()
-  dataAdocao  DateTime @db.Date()
+  dataResgate String?
   fiv         Boolean
   felv        Boolean
   pif         Boolean
   isolado     Boolean
-  observacao  String   @db.Text
+  observacao  String  @db.Text
 }
 
 enum Raca {
