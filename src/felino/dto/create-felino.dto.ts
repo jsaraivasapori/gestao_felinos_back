@@ -2,7 +2,6 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
-  isNotEmpty,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -30,7 +29,7 @@ export class CreateFelinoDto {
   @IsEnum(Raca, { message: 'Raca inválida' })
   raca: Raca;
 
-  @IsString()
+  @IsDateString()
   @IsOptional()
   dataResgate: string;
 

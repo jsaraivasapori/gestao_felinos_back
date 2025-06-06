@@ -15,16 +15,35 @@ datasource db {
 }
 
 model Felinos {
-  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nome        String  @db.VarChar(50)
-  idade       Int     @db.SmallInt
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome        String    @db.VarChar(50)
+  idade       Int       @db.SmallInt
   raca        Raca
-  dataResgate String?
+  dataResgate DateTime?
   fiv         Boolean
   felv        Boolean
   pif         Boolean
   isolado     Boolean
-  observacao  String  @db.Text
+  observacao  String    @db.Text
+}
+
+model Voluntarios {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome            String   @db.VarChar(50)
+  telefone        String   @db.VarChar(12)
+  turno           Turno
+  largadouro      String   @db.VarChar(255)
+  bairro          String   @db.VarChar(255)
+  cidade          String   @db.VarChar(255)
+  cep             String?  @db.VarChar(8)
+  dataCriacao     DateTime @default(now())
+  dataAtualizacao DateTime @updatedAt
+}
+
+enum Turno {
+  matutino
+  vespertino
+  noturno
 }
 
 enum Raca {
