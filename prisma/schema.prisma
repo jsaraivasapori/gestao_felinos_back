@@ -40,6 +40,21 @@ model Voluntarios {
   dataAtualizacao DateTime @updatedAt
 }
 
+model Usuarios {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome            String   @db.VarChar(50)
+  login           String   @db.VarChar(255)
+  senha           String   @db.VarChar(255)
+  perfil          Perfil
+  dataCriacao     DateTime @default(now())
+  dataAtualziacao DateTime @updatedAt
+}
+
+enum Perfil {
+  Administrador
+  Gerencial
+}
+
 enum Turno {
   matutino
   vespertino
