@@ -33,7 +33,7 @@ export class UsuarioService {
 
   async update(id: string, updateUsuarioDto: UpdateUsuarioDto) {
     try {
-      return await this.prisma.felinos.update({
+      return await this.prisma.usuarios.update({
         where: { id },
         data: updateUsuarioDto,
       });

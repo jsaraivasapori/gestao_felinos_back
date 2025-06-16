@@ -1,5 +1,5 @@
 import { Perfil } from '@prisma/client';
-import { IsNotEmpty } from 'class-validator';
+import { IsDateString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class CreateUsuarioDto {
   @IsNotEmpty()
