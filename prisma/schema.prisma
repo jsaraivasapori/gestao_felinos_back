@@ -25,6 +25,51 @@ model Felinos {
   pif         Boolean
   isolado     Boolean
   observacao  String    @db.Text
+
+  //relações
+  vacinacoes VacinacoesRealizadas[]
+  protocolos ProtocoloVacinal[]
+}
+
+model Vacinas {
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome String @db.VarChar(50)
+
+  //relações
+  aplicacoes VacinacoesRealizadas[]
+  protocolos ProtocoloVacinal[]
+
+  @@unique([nome])
+}
+
+model VacinacoesRealizadas {
+  felinoId     String   @db.Uuid
+  vacinaId     String   @db.Uuid
+  dataApliccao DateTime @default(now())
+  valorPago    Float    @db.Real
+
+  //Relaçoes
+  felino Felinos @relation(fields: [felinoId], references: [id])
+  vacina Vacinas @relation(fields: [vacinaId], references: [id])
+
+  @@id([felinoId, vacinaId, dataApliccao]) //3 atributos como id para ter mais de uma dose para mesmo gato
+}
+
+model ProtocoloVacinal {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  felinoId String @db.Uuid
+  vacinaId String @db.Uuid
+
+  dosesNecessarias          Int         @db.SmallInt // Ex: 3 (dose inicial + 2 reforços)
+  intervaloEntreDosesEmDias Int         @db.SmallInt // Ex: 21 (dias)
+  status                    StatusCiclo
+
+  // Relações
+  felino Felinos @relation(fields: [felinoId], references: [id])
+  vacina Vacinas @relation(fields: [vacinaId], references: [id])
+
+  // Garante que um gato só tenha um protocolo ativo para cada tipo de vacina
+  @@unique([felinoId, vacinaId])
 }
 
 model Voluntarios {
@@ -53,6 +98,13 @@ model Usuarios {
 enum Perfil {
   Administrador
   Gerencial
+}
+
+enum StatusCiclo {
+  PENDENTE // O ciclo foi definido, mas nenhuma dose foi aplicada
+  EM_ANDAMENTO // Doses foram aplicadas, mas o ciclo não está completo e não está atrasado
+  ATRASADO // O prazo para a próxima dose expirou
+  COMPLETO // Todas as doses necessárias foram aplicadas
 }
 
 enum Turno {
