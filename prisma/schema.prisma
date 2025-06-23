@@ -47,6 +47,9 @@ model Vacinas {
 model VacinacoesRealizadas {
   felinoId     String   @db.Uuid
   vacinaId     String   @db.Uuid
+  laboratorio  String   @db.VarChar(255)
+  lote         String   @db.VarChar(255)
+  medVet       String   @db.VarChar(50)
   dataApliccao DateTime @default(now())
   valorPago    Float    @db.Real
 
