@@ -1,26 +1,49 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateVacinaDto } from './dto/create-vacina.dto';
 import { UpdateVacinaDto } from './dto/update-vacina.dto';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class VacinasService {
-  create(createVacinaDto: CreateVacinaDto) {
-    return 'This action adds a new vacina';
+  constructor(private prisma: PrismaService) {}
+  async create(createVacinaDto: CreateVacinaDto) {
+    return this.prisma.vacinas.create({ data: createVacinaDto });
   }
 
-  findAll() {
-    return `This action returns all vacinas`;
+  async findAll() {
+    return this.prisma.vacinas.findMany();
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} vacina`;
+  async findOne(id: string) {
+    try {
+      return await this.prisma.vacinas.findUnique({ where: { id } });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException({
+          message: 'Usuário não encontrado',
+          erro: 'Not found',
+          statusCode: 404,
+        });
+      }
+      throw error;
+    }
   }
 
-  update(id: number, updateVacinaDto: UpdateVacinaDto) {
-    return `This action updates a #${id} vacina`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} vacina`;
+  async update(id: string, updateVacinaDto: UpdateVacinaDto) {
+    try {
+      return await this.prisma.vacinas.update({
+        where: { id },
+        data: updateVacinaDto,
+      });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException({
+          message: 'Usuário não encontrado',
+          error: 'Not found',
+          statusCode: 404,
+        });
+      }
+      throw error;
+    }
   }
 }
