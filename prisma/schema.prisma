@@ -42,6 +42,8 @@ model Vacinas {
   @@unique([nome])
 }
 
+//Tabela de junção entre felino e vacina (o que ocorreu)
+
 model VacinacoesRealizadas {
   felinoId     String   @db.Uuid
   vacinaId     String   @db.Uuid
@@ -55,6 +57,7 @@ model VacinacoesRealizadas {
   @@id([felinoId, vacinaId, dataApliccao]) //3 atributos como id para ter mais de uma dose para mesmo gato
 }
 
+//Tabela de junção entre felino e vacina (o que deve ocorrer)
 model ProtocoloVacinal {
   id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   felinoId String @db.Uuid
@@ -68,8 +71,7 @@ model ProtocoloVacinal {
   felino Felinos @relation(fields: [felinoId], references: [id])
   vacina Vacinas @relation(fields: [vacinaId], references: [id])
 
-  // Garante que um gato só tenha um protocolo ativo para cada tipo de vacina
-  @@unique([felinoId, vacinaId])
+  @@unique([felinoId, vacinaId]) // Garante que um gato só tenha um protocolo ativo para cada tipo de vacina
 }
 
 model Voluntarios {
