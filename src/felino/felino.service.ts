@@ -6,7 +6,9 @@ import { PrismaService } from 'src/prisma/prisma.service';
 @Injectable()
 export class FelinoService {
   constructor(private prisma: PrismaService) {}
+  //Inicio metodos  vacina por felino
 
+  //Inicio metodos basicos CRUD
   async create(createFelinoDto: CreateFelinoDto) {
     return await this.prisma.felinos.create({
       data: createFelinoDto,
@@ -66,4 +68,5 @@ export class FelinoService {
       throw error;
     }
   }
+  //Fim metodos basicos CRUD
 }

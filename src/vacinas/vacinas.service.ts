@@ -6,6 +6,9 @@ import { PrismaService } from 'src/prisma/prisma.service';
 @Injectable()
 export class VacinasService {
   constructor(private prisma: PrismaService) {}
+
+  // Inicio metodos básicos
+
   async create(createVacinaDto: CreateVacinaDto) {
     return this.prisma.vacinas.create({ data: createVacinaDto });
   }
@@ -46,4 +49,5 @@ export class VacinasService {
       throw error;
     }
   }
+  // Fim metodos basicos
 }
