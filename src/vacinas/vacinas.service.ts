@@ -8,17 +8,51 @@ import { UpdateVacinaDto } from './dto/update-vacina.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateVacinacaoDto } from './dto/vacinacao/vacinacao-create-dto';
 import { StatusCiclo } from '@prisma/client';
+import { UpdateProtocoloVacinalDto } from './dto/vacinacao/update-protocolo-vacinal-dto';
 
 @Injectable()
 export class VacinasService {
   constructor(private prisma: PrismaService) {}
 
-  // Inicio Metodos Vacinaçao
-  /**
-   * Registra a primeira dose de uma vacina para um felino
-   * e cria o protocolo vacinal correspondente.
-   * Tudo dentro de uma única transação.
-   */
+  async editarPlanoVacinal(
+    protocoloId: string,
+    updateProtocoloDto: UpdateProtocoloVacinalDto,
+  ) {
+    try {
+      const protocoloAtualizado = await this.prisma.protocoloVacinal.update({
+        where: {
+          id: protocoloId,
+        },
+        data: updateProtocoloDto,
+      });
+      return protocoloAtualizado;
+    } catch (error) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException(
+          `Protocolo com id ${protocoloId} não encontrado `,
+        );
+      }
+      throw error;
+    }
+  }
+
+  async editarPlanoVacinalStatus(protocoloId: string, status: StatusCiclo) {
+    try {
+      const protocoloStatusAtualizado =
+        await this.prisma.protocoloVacinal.update({
+          where: { id: protocoloId },
+          data: { status: status },
+        });
+      return protocoloStatusAtualizado;
+    } catch (error) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException(
+          `Protocolo com id: ${protocoloId} não foi encontrado`,
+        );
+      }
+      throw error;
+    }
+  }
   async registrarPrimeiraDose(primeiraVacina: CreateVacinacaoDto) {
     return this.prisma.$transaction(async (tx) => {
       const felinoExiste = await tx.felinos.findUnique({
@@ -66,8 +100,6 @@ export class VacinasService {
       return { vacinaRealizada, protocoloVacinal };
     });
   }
-
-  // Fim Metodos Vacinação
 
   // Inicio metodos básicos
 
