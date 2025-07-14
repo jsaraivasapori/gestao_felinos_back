@@ -19,6 +19,11 @@ export class FelinoService {
     return this.prisma.felinos.findMany();
   }
 
+  async returnFelinoNameAndId() {
+    return this.prisma.felinos.findMany({
+      select: { id: true, nome: true },
+    });
+  }
   async findOne(id: string) {
     const felino = await this.prisma.felinos.findUnique({
       where: { id: id },

@@ -24,6 +24,10 @@ export class FelinoController {
   async findAll() {
     return await this.felinoService.findAll();
   }
+  @Get('nomes')
+  async findAllNames() {
+    return await this.felinoService.returnFelinoNameAndId();
+  }
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
