@@ -7,8 +7,9 @@ import { CreateVacinaDto } from './dto/create-vacina.dto';
 import { UpdateVacinaDto } from './dto/update-vacina.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateVacinacaoDto } from './dto/vacinacao/vacinacao-create-dto';
-import { StatusCiclo } from '@prisma/client';
+import { Prisma, StatusCiclo } from '@prisma/client';
 import { RegistrarDoseSubsequenteDto } from './dto/vacinacao/vacinacao-subsequente-create-dto';
+import { connect } from 'http2';
 
 /**
  * Service responsável pela lógica de negócio relacionada a Vacinas e ao processo de Vacinação.
@@ -31,9 +32,12 @@ export class VacinasService {
    * @param primeiraVacina DTO com os dados para criar o protocolo e registrar a primeira dose.
    * @returns Um objeto contendo a vacina aplicada e o protocolo criado.
    */
+  // Não se esqueça de importar 'Prisma' junto com 'StatusCiclo'
+  // import { StatusCiclo, Prisma } from '@prisma/client';
+
   async registrarPrimeiraDose(primeiraVacina: CreateVacinacaoDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Validação 1: Garante que o felino e a vacina informados realmente existem no banco.
+      // ... suas validações iniciais não mudam ...
       const felinoExiste = await tx.felinos.findUnique({
         where: { id: primeiraVacina.felinoId },
       });
@@ -42,7 +46,6 @@ export class VacinasService {
           `Felino com o ID ${primeiraVacina.felinoId} não encontrado`,
         );
       }
-
       const vacinaExiste = await tx.vacinas.findUnique({
         where: { id: primeiraVacina.vacinaId },
       });
@@ -51,8 +54,6 @@ export class VacinasService {
           `Vacina com o ID ${primeiraVacina.vacinaId} não encontrada`,
         );
       }
-
-      // Validação 2: Garante que não existe um protocolo "em aberto" para este mesmo felino e vacina.
       const protocoloNaoConcluido = await tx.protocoloVacinal.findFirst({
         where: {
           felinoId: primeiraVacina.felinoId,
@@ -66,63 +67,63 @@ export class VacinasService {
           },
         },
       });
-
       if (protocoloNaoConcluido) {
         throw new BadRequestException(
           `Já existe um protocolo em andamento com status '${protocoloNaoConcluido.status}'. Finalize-o antes de iniciar um novo.`,
         );
       }
-      let intervaloEntreDoses;
-      let statusAtual;
-      // Lógica 1: Determina o status inicial do ciclo.
-      // const statusAtual =
-      //   primeiraVacina.dosesNecessarias === 1
-      //     ? StatusCiclo.COMPLETO
-      //     : StatusCiclo.EM_ANDAMENTO;
-      if (primeiraVacina.dosesNecessarias === 1) {
-        statusAtual = StatusCiclo.COMPLETO;
-        intervaloEntreDoses = null; // Não há intervalo para dose única.
-      } else {
-        statusAtual = StatusCiclo.EM_ANDAMENTO;
-      }
 
-      // Lógica 2: Calcula as datas futuras com base no status.
+      // Lógica de negócio (sem alterações aqui)
+      let statusAtual: StatusCiclo;
+      let intervaloEntreDoses: number | undefined;
       let proximaDose: Date | null = null;
       let lembreteProximoCiclo: Date | null = null;
 
-      if (statusAtual === StatusCiclo.EM_ANDAMENTO) {
-        // Se o ciclo tem múltiplas doses, calcula a data da próxima dose interna.
+      if (primeiraVacina.dosesNecessarias === 1) {
+        statusAtual = StatusCiclo.COMPLETO;
+      } else {
+        statusAtual = StatusCiclo.EM_ANDAMENTO;
+        intervaloEntreDoses = primeiraVacina.intervaloEntreDosesEmDias;
+      }
+
+      if (statusAtual === StatusCiclo.EM_ANDAMENTO && intervaloEntreDoses) {
         proximaDose = new Date();
-        proximaDose.setDate(
-          proximaDose.getDate() + primeiraVacina.intervaloEntreDosesEmDias!,
-        );
+        proximaDose.setDate(proximaDose.getDate() + intervaloEntreDoses);
       } else if (
         statusAtual === StatusCiclo.COMPLETO &&
-        primeiraVacina.requerReforcoAnual &&
-        !primeiraVacina.intervaloEntreDosesEmDias // Apenas se for dose única E anual.
+        primeiraVacina.requerReforcoAnual
       ) {
-        // Se for dose única e anual, já calcula o lembrete para o próximo ano.
         lembreteProximoCiclo = new Date();
         lembreteProximoCiclo.setFullYear(
           lembreteProximoCiclo.getFullYear() + 1,
         );
       }
 
-      // Passo 1 da Transação: Cria o protocolo primeiro para obter seu ID.
-      const protocoloVacinal = await tx.protocoloVacinal.create({
-        data: {
-          felinoId: primeiraVacina.felinoId,
-          vacinaId: primeiraVacina.vacinaId,
-          dosesNecessarias: primeiraVacina.dosesNecessarias,
-          intervaloEntreDosesEmDias: intervaloEntreDoses,
-          requerReforcoAnual: primeiraVacina.requerReforcoAnual,
-          status: statusAtual,
-          dataProximaVacina: proximaDose,
-          dataLembreteProximoCiclo: lembreteProximoCiclo,
-        },
-      });
+      // ===================================================================
+      // MUDANÇA PRINCIPAL - CONSTRUÇÃO DO OBJETO 'data'
+      // ===================================================================
 
-      // Passo 2 da Transação: Cria o registro da dose aplicada, ligando-o ao protocolo.
+      // Passo 1: Crie o objeto base com todos os campos obrigatórios.
+      // Usamos o tipo Prisma.ProtocoloVacinalCreateInput para ajudar o TypeScript.
+      const data: Prisma.ProtocoloVacinalCreateInput = {
+        felino: { connect: { id: primeiraVacina.felinoId } },
+        vacina: { connect: { id: primeiraVacina.vacinaId } },
+        dosesNecessarias: primeiraVacina.dosesNecessarias,
+        requerReforcoAnual: primeiraVacina.requerReforcoAnual,
+        status: statusAtual,
+        dataProximaVacina: proximaDose,
+        dataLembreteProximoCiclo: lembreteProximoCiclo,
+      };
+
+      // Passo 2: Adicione a propriedade opcional SOMENTE se ela tiver um valor.
+      if (intervaloEntreDoses !== undefined) {
+        data.intervaloEntreDosesEmDias = intervaloEntreDoses;
+      }
+
+      // Agora, passe o objeto 'data' completamente montado e validado.
+      const protocoloVacinal = await tx.protocoloVacinal.create({ data });
+
+      // Criação do registro da dose (não muda)
       const vacinaRealizada = await tx.vacinacoesRealizadas.create({
         data: {
           felinoId: primeiraVacina.felinoId,
@@ -131,14 +132,13 @@ export class VacinasService {
           laboratorio: primeiraVacina.laboratorio,
           medVet: primeiraVacina.medVet,
           valorPago: primeiraVacina.valorPago,
-          protocoloVacinalId: protocoloVacinal.id, // Ligação crucial com o ciclo de tratamento.
+          protocoloVacinalId: protocoloVacinal.id,
         },
       });
 
       return { vacinaRealizada, protocoloVacinal };
     });
   }
-
   /**
    * Registra uma dose subsequente (2ª, 3ª, etc.) e atualiza o protocolo existente.
    * Finaliza o ciclo se a última dose for aplicada e agenda o lembrete anual se necessário.

@@ -48,7 +48,7 @@ export class CreateVacinacaoDto {
   dataProximaVacina: Date;
 
   @Transform(({ value }) =>
-    value === '' || value === undefined ? null : Number(value),
+    value === null || value === undefined ? null : Number(value),
   )
   @IsOptional()
   @IsInt()
