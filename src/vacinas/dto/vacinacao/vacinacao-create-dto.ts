@@ -1,3 +1,4 @@
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDateString,
@@ -31,11 +32,13 @@ export class CreateVacinacaoDto {
   @IsNotEmpty()
   medVet: string;
 
+  @Type(() => Number)
   @IsNumber()
   @IsPositive()
   valorPago: number;
 
   // Informações para o NOVO protocolo
+  @Type(() => Number)
   @IsInt()
   @IsPositive()
   dosesNecessarias: number;
@@ -43,9 +46,14 @@ export class CreateVacinacaoDto {
   @IsDateString()
   @IsOptional()
   dataProximaVacina: Date;
+
+  @Transform(({ value }) =>
+    value === '' || value === undefined ? null : Number(value),
+  )
+  @IsOptional()
   @IsInt()
   @IsPositive()
-  intervaloEntreDosesEmDias: number;
+  intervaloEntreDosesEmDias?: number;
 
   @IsBoolean()
   requerReforcoAnual;

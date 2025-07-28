@@ -68,8 +68,8 @@ model ProtocoloVacinal {
   felinoId String @db.Uuid
   vacinaId String @db.Uuid
 
-  dosesNecessarias          Int                    @db.SmallInt // Ex: 3 (dose inicial + 2 reforços)
-  intervaloEntreDosesEmDias Int                    @db.SmallInt // Ex: 21 (dias)
+  dosesNecessarias          Int?                   @db.SmallInt // Ex: 3 (dose inicial + 2 reforços)
+  intervaloEntreDosesEmDias Int?                   @db.SmallInt // Ex: 21 (dias)
   status                    StatusCiclo
   dataProximaVacina         DateTime?
   dataLembreteProximoCiclo  DateTime?

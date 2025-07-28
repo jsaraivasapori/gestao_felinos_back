@@ -72,12 +72,19 @@ export class VacinasService {
           `Já existe um protocolo em andamento com status '${protocoloNaoConcluido.status}'. Finalize-o antes de iniciar um novo.`,
         );
       }
-
+      let intervaloEntreDoses;
+      let statusAtual;
       // Lógica 1: Determina o status inicial do ciclo.
-      const statusAtual =
-        primeiraVacina.dosesNecessarias === 1
-          ? StatusCiclo.COMPLETO
-          : StatusCiclo.EM_ANDAMENTO;
+      // const statusAtual =
+      //   primeiraVacina.dosesNecessarias === 1
+      //     ? StatusCiclo.COMPLETO
+      //     : StatusCiclo.EM_ANDAMENTO;
+      if (primeiraVacina.dosesNecessarias === 1) {
+        statusAtual = StatusCiclo.COMPLETO;
+        intervaloEntreDoses = null; // Não há intervalo para dose única.
+      } else {
+        statusAtual = StatusCiclo.EM_ANDAMENTO;
+      }
 
       // Lógica 2: Calcula as datas futuras com base no status.
       let proximaDose: Date | null = null;
@@ -87,11 +94,12 @@ export class VacinasService {
         // Se o ciclo tem múltiplas doses, calcula a data da próxima dose interna.
         proximaDose = new Date();
         proximaDose.setDate(
-          proximaDose.getDate() + primeiraVacina.intervaloEntreDosesEmDias,
+          proximaDose.getDate() + primeiraVacina.intervaloEntreDosesEmDias!,
         );
       } else if (
         statusAtual === StatusCiclo.COMPLETO &&
-        primeiraVacina.requerReforcoAnual // Apenas se for dose única E anual.
+        primeiraVacina.requerReforcoAnual &&
+        !primeiraVacina.intervaloEntreDosesEmDias // Apenas se for dose única E anual.
       ) {
         // Se for dose única e anual, já calcula o lembrete para o próximo ano.
         lembreteProximoCiclo = new Date();
@@ -106,7 +114,7 @@ export class VacinasService {
           felinoId: primeiraVacina.felinoId,
           vacinaId: primeiraVacina.vacinaId,
           dosesNecessarias: primeiraVacina.dosesNecessarias,
-          intervaloEntreDosesEmDias: primeiraVacina.intervaloEntreDosesEmDias,
+          intervaloEntreDosesEmDias: intervaloEntreDoses,
           requerReforcoAnual: primeiraVacina.requerReforcoAnual,
           status: statusAtual,
           dataProximaVacina: proximaDose,
@@ -182,7 +190,7 @@ export class VacinasService {
       let novoStatus: StatusCiclo = StatusCiclo.EM_ANDAMENTO;
 
       // 5. Decide o que fazer com base na contagem de doses.
-      if (dosesRealizadasCount >= protocolo.dosesNecessarias) {
+      if (dosesRealizadasCount >= protocolo.dosesNecessarias!) {
         // --- O CICLO TERMINOU ---
         novoStatus = StatusCiclo.COMPLETO;
         proximaDose = null; // Não há próxima dose neste ciclo.
@@ -199,7 +207,7 @@ export class VacinasService {
         novoStatus = StatusCiclo.EM_ANDAMENTO; // Garante que, se estava ATRASADO, volte ao normal.
         proximaDose = new Date(); // A partir da data da aplicação atual
         proximaDose.setDate(
-          proximaDose.getDate() + protocolo.intervaloEntreDosesEmDias,
+          proximaDose.getDate() + protocolo.intervaloEntreDosesEmDias!,
         );
       }
 
