@@ -20,6 +20,11 @@ export class VacinasController {
   //====================================================================================
   // CONTROLADORES DE VACINAÇÃO. CRIAR PRIEMIRA DOSE E CRIAR DOSES SUBSEQUENTES
   //====================================================================================
+
+  @Get('vacinacao')
+  async getAllVaccinations() {
+    return this.vacinasService.getAllVaccination();
+  }
   @Post('vacinacao')
   async createNewVaccination(@Body() createVacinacaoDto: CreateVacinacaoDto) {
     return this.vacinasService.registrarPrimeiraDose(createVacinacaoDto);

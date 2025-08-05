@@ -50,7 +50,7 @@ model VacinacoesRealizadas {
   laboratorio        String   @db.VarChar(255)
   lote               String   @db.VarChar(255)
   medVet             String   @db.VarChar(50)
-  dataApliccao       DateTime @default(now())
+  dataAplicacao      DateTime @default(now())
   valorPago          Float    @db.Real
   protocoloVacinalId String   @db.Uuid
 
@@ -59,7 +59,7 @@ model VacinacoesRealizadas {
   vacina           Vacinas          @relation(fields: [vacinaId], references: [id])
   protocoloVacinal ProtocoloVacinal @relation(fields: [protocoloVacinalId], references: [id])
 
-  @@id([felinoId, vacinaId, dataApliccao]) //3 atributos como id para ter mais de uma dose para mesmo gato
+  @@id([felinoId, vacinaId, dataAplicacao]) //3 atributos como id para ter mais de uma dose para mesmo gato
 }
 
 //Tabela de junção entre felino e vacina (o que deve ocorrer)

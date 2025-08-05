@@ -35,6 +35,27 @@ export class VacinasService {
   // Não se esqueça de importar 'Prisma' junto com 'StatusCiclo'
   // import { StatusCiclo, Prisma } from '@prisma/client';
 
+  async getAllVaccination() {
+    return this.prisma.vacinacoesRealizadas.findMany({
+      select: {
+        dataAplicacao: true,
+        felino: {
+          select: {
+            id: true,
+            nome: true,
+          },
+        },
+        vacina: {
+          select: {
+            nome: true,
+          },
+        },
+        protocoloVacinal: {
+          select: { id: true, status: true },
+        },
+      },
+    });
+  }
   async registrarPrimeiraDose(primeiraVacina: CreateVacinacaoDto) {
     return this.prisma.$transaction(async (tx) => {
       // ... suas validações iniciais não mudam ...
