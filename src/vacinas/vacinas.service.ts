@@ -98,7 +98,10 @@ export class VacinasService {
       if (dosesAplicadas >= protocolo.dosesNecessarias) {
         novoStatus = StatusCiclo.COMPLETO;
         proximaData = null; // Ciclo completo, não há próxima data
-        if (dosesAplicadas === protocolo.dosesNecessarias) {
+        if (
+          dosesAplicadas === protocolo.dosesNecessarias &&
+          protocolo.requerReforcoAnual
+        ) {
           dataLembreteProximoCiclo = new Date();
           dataLembreteProximoCiclo.setFullYear(
             dataLembreteProximoCiclo.getFullYear() + 1,
