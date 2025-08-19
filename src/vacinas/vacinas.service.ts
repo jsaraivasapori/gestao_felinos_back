@@ -93,10 +93,17 @@ export class VacinasService {
 
       let novoStatus: StatusCiclo = StatusCiclo.EM_ANDAMENTO;
       let proximaData: Date | null = new Date();
+      let dataLembreteProximoCiclo: Date | null = null;
 
       if (dosesAplicadas >= protocolo.dosesNecessarias) {
         novoStatus = StatusCiclo.COMPLETO;
         proximaData = null; // Ciclo completo, não há próxima data
+        if (dosesAplicadas === protocolo.dosesNecessarias) {
+          dataLembreteProximoCiclo = new Date();
+          dataLembreteProximoCiclo.setFullYear(
+            dataLembreteProximoCiclo.getFullYear() + 1,
+          ); // Define lembrete para o próximo ano
+        }
       } else {
         // Calcula a data da próxima dose
         proximaData.setDate(
@@ -110,6 +117,7 @@ export class VacinasService {
         data: {
           status: novoStatus,
           dataProximaVacina: proximaData,
+          dataLembreteProximoCiclo: dataLembreteProximoCiclo,
         },
         include: {
           aplicacoes: true, // Retorna o protocolo com as aplicações para confirmação
