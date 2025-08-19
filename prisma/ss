@@ -1,6 +1,9 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
@@ -23,57 +26,60 @@ model Felinos {
   isolado     Boolean
   observacao  String    @db.Text
 
-  // RELAÇÃO SIMPLIFICADA: Um felino agora tem apenas uma lista de protocolos.
-  // As vacinas aplicadas são acessadas através de cada protocolo.
+  //relações
+  vacinacoes VacinacoesRealizadas[]
   protocolos ProtocoloVacinal[]
 }
 
 model Vacinas {
   id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nome String @unique @db.VarChar(50)
+  nome String @db.VarChar(50)
 
-  // RELAÇÃO SIMPLIFICADA: Uma vacina está presente em vários protocolos.
+  //relações
+  aplicacoes VacinacoesRealizadas[]
   protocolos ProtocoloVacinal[]
+
+  @@unique([nome])
 }
 
-// RENOMEADO: Para maior clareza, VacinacoesRealizadas -> AplicacaoVacina
-// Esta tabela agora representa uma ÚNICA dose de uma vacina.
-model AplicacaoVacina {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid // Adicionado um ID único para facilitar a identificação de cada aplicação
+//Tabela de junção entre felino e vacina (o que ocorreu)
 
-  laboratorio   String   @db.VarChar(255)
-  lote          String   @db.VarChar(255)
-  medVet        String   @db.VarChar(50)
-  dataAplicacao DateTime @default(now())
-  valorPago     Float    @db.Real
+model VacinacoesRealizadas {
+  felinoId           String   @db.Uuid
+  vacinaId           String   @db.Uuid
+  laboratorio        String   @db.VarChar(255)
+  lote               String   @db.VarChar(255)
+  medVet             String   @db.VarChar(50)
+  dataAplicacao      DateTime @default(now())
+  valorPago          Float    @db.Real
+  protocoloVacinalId String   @db.Uuid
 
-  // Relação clara: Cada aplicação pertence a UM protocolo.
-  protocoloVacinalId String           @db.Uuid
-  protocoloVacinal   ProtocoloVacinal @relation(fields: [protocoloVacinalId], references: [id])
+  //Relaçoes
+  felino           Felinos          @relation(fields: [felinoId], references: [id])
+  vacina           Vacinas          @relation(fields: [vacinaId], references: [id])
+  protocoloVacinal ProtocoloVacinal @relation(fields: [protocoloVacinalId], references: [id])
+
+  @@id([felinoId, vacinaId, dataAplicacao]) //3 atributos como id para ter mais de uma dose para mesmo gato
 }
 
-// Esta é a tabela central que gerencia o ciclo de vacinação.
+//Tabela de junção entre felino e vacina (o que deve ocorrer)
 model ProtocoloVacinal {
   id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   felinoId String @db.Uuid
   vacinaId String @db.Uuid
 
-  dosesNecessarias          Int         @db.SmallInt // Ex: 3 (dose inicial + 2 reforços)
-  intervaloEntreDosesEmDias Int         @db.SmallInt // Ex: 21 (dias)
+  dosesNecessarias          Int?                   @db.SmallInt // Ex: 3 (dose inicial + 2 reforços)
+  intervaloEntreDosesEmDias Int?                   @db.SmallInt // Ex: 21 (dias)
   status                    StatusCiclo
   dataProximaVacina         DateTime?
+  dataLembreteProximoCiclo  DateTime?
   requerReforcoAnual        Boolean
-
   // Relações
-  felino     Felinos           @relation(fields: [felinoId], references: [id])
-  vacina     Vacinas           @relation(fields: [vacinaId], references: [id])
-  aplicacoes AplicacaoVacina[] // Um protocolo é composto por uma ou mais aplicações (doses)
-
-  // Garante que só existe um protocolo por felino/vacina.
-  @@unique([felinoId, vacinaId])
+  felino                    Felinos                @relation(fields: [felinoId], references: [id])
+  vacina                    Vacinas                @relation(fields: [vacinaId], references: [id])
+  VacinacoesRealizadas      VacinacoesRealizadas[]
 }
 
-// Models Voluntarios e Usuarios permanecem os mesmos
 model Voluntarios {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   nome            String   @db.VarChar(50)
@@ -97,17 +103,16 @@ model Usuarios {
   dataAtualziacao DateTime @updatedAt
 }
 
-// Enums permanecem os mesmos
 enum Perfil {
   Administrador
   Gerencial
 }
 
 enum StatusCiclo {
-  PENDENTE
-  EM_ANDAMENTO
-  ATRASADO
-  COMPLETO
+  PENDENTE // O ciclo foi definido, mas nenhuma dose foi aplicada
+  EM_ANDAMENTO // Doses foram aplicadas, mas o ciclo não está completo e não está atrasado
+  ATRASADO // O prazo para a próxima dose expirou
+  COMPLETO // Todas as doses necessárias foram aplicadas. vira historico
 }
 
 enum Turno {
