@@ -58,16 +58,16 @@ model ProtocoloVacinal {
   felinoId String @db.Uuid
   vacinaId String @db.Uuid
 
-  dosesNecessarias          Int         @db.SmallInt // Ex: 3 (dose inicial + 2 reforços)
-  intervaloEntreDosesEmDias Int         @db.SmallInt // Ex: 21 (dias)
+  dosesNecessarias          Int               @db.SmallInt // Ex: 3 (dose inicial + 2 reforços)
+  intervaloEntreDosesEmDias Int               @db.SmallInt // Ex: 21 (dias)
   status                    StatusCiclo
   dataProximaVacina         DateTime?
   requerReforcoAnual        Boolean
-
+  dataLembreteProximoCiclo  DateTime?
   // Relações
-  felino     Felinos           @relation(fields: [felinoId], references: [id])
-  vacina     Vacinas           @relation(fields: [vacinaId], references: [id])
-  aplicacoes AplicacaoVacina[] // Um protocolo é composto por uma ou mais aplicações (doses)
+  felino                    Felinos           @relation(fields: [felinoId], references: [id])
+  vacina                    Vacinas           @relation(fields: [vacinaId], references: [id])
+  aplicacoes                AplicacaoVacina[] // Um protocolo é composto por uma ou mais aplicações (doses)
 
   // Garante que só existe um protocolo por felino/vacina.
   @@unique([felinoId, vacinaId])
