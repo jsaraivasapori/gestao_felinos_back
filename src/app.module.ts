@@ -4,8 +4,16 @@ import { PrismaModule } from './prisma/prisma.module';
 import { VoluntarioModule } from './voluntario/voluntario.module';
 import { UsuariosModule } from './usuarios/usuario.module';
 import { VacinasModule } from './vacinas/vacinas.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
-  imports: [FelinoModule, PrismaModule, VoluntarioModule, UsuariosModule, VacinasModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    FelinoModule,
+    PrismaModule,
+    VoluntarioModule,
+    UsuariosModule,
+    VacinasModule,
+  ],
 })
 export class AppModule {}

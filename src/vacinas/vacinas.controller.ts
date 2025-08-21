@@ -6,12 +6,13 @@ import {
   Patch,
   Param,
   Delete,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { VacinasService } from './vacinas.service';
 import { CreateVacinaDto } from './dto/create-vacina.dto';
 import { UpdateVacinaDto } from './dto/update-vacina.dto';
-import { CreateVacinacaoDto } from './dto/vacinacao/vacinacao-create-dto';
-import { RegistrarDoseSubsequenteDto } from './dto/vacinacao/vacinacao-subsequente-create-dto';
+import { RegistrarVacinacaoDto } from './dto/registar-vacina.dto';
+import { get } from 'http';
 
 @Controller('vacinas')
 export class VacinasController {
@@ -21,22 +22,24 @@ export class VacinasController {
   // CONTROLADORES DE VACINAÇÃO. CRIAR PRIEMIRA DOSE E CRIAR DOSES SUBSEQUENTES
   //====================================================================================
 
-  @Get('vacinacao')
-  async getAllVaccinations() {
-    return this.vacinasService.getAllVaccination();
-  }
-  @Post('vacinacao')
-  async createNewVaccination(@Body() createVacinacaoDto: CreateVacinacaoDto) {
-    return this.vacinasService.registrarPrimeiraDose(createVacinacaoDto);
+  @Post('registrar')
+  async registrar(@Body() registrarVacinacaoDto: RegistrarVacinacaoDto) {
+    return this.vacinasService.registrar(registrarVacinacaoDto);
   }
 
-  @Post('vacinacao/nova-dose')
-  async createNewDose(
-    @Body() registrarDoseSubsequenteDto: RegistrarDoseSubsequenteDto,
-  ) {
-    return this.vacinasService.aplicarDosesSubsequentes(
-      registrarDoseSubsequenteDto,
-    );
+  @Get('felino/:felinoId')
+  buscarPorFelino(@Param('felinoId', ParseUUIDPipe) felinoId: string) {
+    return this.vacinasService.buscarPorFelino(felinoId);
+  }
+
+  @Get('alertas')
+  buscarAlertas() {
+    return this.vacinasService.alertas();
+  }
+
+  @Get('reforcos-anauais')
+  buscarReforcosAnuais() {
+    return this.vacinasService.buscarReforcosAnuais();
   }
 
   //==========================================================================================
