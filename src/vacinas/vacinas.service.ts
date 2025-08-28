@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateVacinaDto } from './dto/create-vacina.dto';
 import { UpdateVacinaDto } from './dto/update-vacina.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -53,6 +58,7 @@ export class VacinasService {
     dto: RegistrarVacinacaoDto,
   ): Promise<ProtocoloVacinal & { aplicacoes: AplicacaoVacina[] }> {
     return this.prisma.$transaction(async (tx) => {
+      // 1. Verificações de existência
       const felino = await tx.felinos.findUnique({
         where: { id: dto.felinoId },
       });
@@ -70,6 +76,26 @@ export class VacinasService {
         );
       }
 
+      // --- INÍCIO DA CORREÇÃO ---
+      // 2. Busca prévia para validar o estado do protocolo antes de qualquer ação
+      const protocoloExistente = await tx.protocoloVacinal.findUnique({
+        where: {
+          felinoId_vacinaId: { felinoId: dto.felinoId, vacinaId: dto.vacinaId },
+        },
+      });
+
+      // Se um protocolo já existe, aplicamos a regra de negócio
+      if (protocoloExistente) {
+        // REGRA: Não permitir adicionar dose a um ciclo já completo.
+        if (protocoloExistente.status === StatusCiclo.COMPLETO) {
+          throw new BadRequestException(
+            `O ciclo de vacinação para "${vacina.nome}" do felino "${felino.nome}" já está completo.`,
+          );
+        }
+      }
+      // --- FIM DA CORREÇÃO ---
+
+      // 3. Encontra ou Cria o Protocolo Vacinal com segurança
       const protocolo = await tx.protocoloVacinal.upsert({
         where: {
           felinoId_vacinaId: { felinoId: dto.felinoId, vacinaId: dto.vacinaId },
@@ -85,6 +111,7 @@ export class VacinasService {
         },
       });
 
+      // 4. Cria o registro da aplicação da dose
       await tx.aplicacaoVacina.create({
         data: {
           laboratorio: dto.laboratorio,
@@ -95,6 +122,7 @@ export class VacinasService {
         },
       });
 
+      // 5. Atualiza o Status do Protocolo
       const dosesAplicadas = await tx.aplicacaoVacina.count({
         where: { protocoloVacinalId: protocolo.id },
       });
@@ -131,7 +159,6 @@ export class VacinasService {
       return protocoloAtualizado;
     });
   }
-
   /**
    * Busca o histórico completo de vacinação de um felino específico.
    * @param {string} felinoId - O ID (UUID) do felino a ser consultado.
@@ -177,23 +204,73 @@ export class VacinasService {
     });
   }
 
+  async BuscarUltimas5Aplicacoes(): Promise<AplicacaoVacina[]> {
+    return this.prisma.aplicacaoVacina.findMany({
+      orderBy: { dataAplicacao: 'desc' },
+      take: 5,
+      include: {
+        protocoloVacinal: {
+          include: {
+            felino: true,
+            vacina: true,
+          },
+        },
+      },
+    });
+  }
+
   /**
    * Busca por protocolos concluídos que têm um reforço anual agendado para os próximos 30 dias.
    * @returns {Promise<ProtocoloVacinal[]>} Uma lista de protocolos com reforços anuais próximos,
    * incluindo dados do felino e da vacina.
    */
-  async buscarReforcosAnuais(): Promise<ProtocoloVacinal[]> {
+  async buscarProximosAgendamentos(): Promise<ProtocoloVacinal[]> {
     const hoje = new Date();
+
+    const amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1);
+    amanha.setHours(0, 0, 0, 0);
+
     const daqui30Dias = new Date();
     daqui30Dias.setDate(hoje.getDate() + 30);
 
-    return this.prisma.protocoloVacinal.findMany({
+    const agendamentos = await this.prisma.protocoloVacinal.findMany({
       where: {
-        status: StatusCiclo.COMPLETO,
-        dataLembreteProximoCiclo: { gte: hoje, lte: daqui30Dias },
+        OR: [
+          // Condição 1: Doses com ciclos em andamento
+          {
+            status: StatusCiclo.EM_ANDAMENTO,
+            dataProximaVacina: { gte: amanha, lte: daqui30Dias },
+          },
+          //Condição 2: Protocolos completos que requerem reforços anauais
+          {
+            status: StatusCiclo.COMPLETO,
+            requerReforcoAnual: true,
+            dataLembreteProximoCiclo: { gte: amanha, lte: daqui30Dias },
+          },
+        ],
       },
       include: { felino: true, vacina: true },
     });
+
+    agendamentos.sort((a, b) => {
+      const dataA = a.dataProximaVacina || a.dataLembreteProximoCiclo;
+      const dataB = b.dataProximaVacina || b.dataLembreteProximoCiclo;
+
+      // --- INÍCIO DA CORREÇÃO ---
+
+      // Se o item 'a' não tiver uma data válida, jogue-o para o final da lista.
+      if (!dataA) return 1;
+      // Se o item 'b' não tiver uma data válida, jogue-o para o final da lista.
+      if (!dataB) return -1;
+
+      // Se chegamos aqui, TypeScript tem certeza que dataA e dataB são datas válidas.
+      // Agora a comparação é segura.
+      return new Date(dataA).getTime() - new Date(dataB).getTime();
+
+      // --- FIM DA CORREÇÃO ---
+    });
+    return agendamentos;
   }
 
   /**
@@ -259,7 +336,7 @@ export class VacinasService {
    * A execução e os resultados são registrados no console.
    * @returns {Promise<void>}
    */
-  @Cron(CronExpression.EVERY_5_MINUTES, {
+  @Cron(CronExpression.EVERY_DAY_AT_2AM, {
     name: 'verificarProtocolosAtrasados',
     timeZone: 'America/Sao_Paulo',
   })

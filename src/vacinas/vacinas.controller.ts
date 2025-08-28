@@ -39,7 +39,12 @@ export class VacinasController {
 
   @Get('reforcos-anauais')
   buscarReforcosAnuais() {
-    return this.vacinasService.buscarReforcosAnuais();
+    return this.vacinasService.buscarProximosAgendamentos();
+  }
+
+  @Get('ultimas-aplicacoes')
+  buscarUltimasAplicacoes() {
+    return this.vacinasService.BuscarUltimas5Aplicacoes();
   }
 
   //==========================================================================================
@@ -56,13 +61,13 @@ export class VacinasController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.vacinasService.findOne(id);
   }
 
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateVacinaDto: UpdateVacinaDto,
   ) {
     return this.vacinasService.update(id, updateVacinaDto);
