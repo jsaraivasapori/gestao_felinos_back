@@ -274,6 +274,73 @@ export class VacinasService {
   }
 
   /**
+   * Calcula e retorna os principais indicadores de desempenho (KPIs) para o dashboard de vacinas.
+   *
+   * @description
+   * Este método é otimizado para performance, executando quatro consultas de contagem independentes
+   * em paralelo usando `Promise.all`. Ele fornece uma 'fotografia' em tempo real do estado de
+   * todo o sistema de vacinação, garantindo que os números exibidos no dashboard sejam sempre
+   * precisos e atualizados no momento da requisição.
+   *
+   * @returns {Promise<object>} Uma Promise que resolve para um objeto com os seguintes KPIs:
+   * - `aplicado`: (number) O número total de doses de vacina que já foram aplicadas.
+   * - `agendado`: (number) Protocolos `EM_ANDAMENTO` ou `PENDENTE` com data de próxima dose para hoje ou no futuro.
+   * - `atrasado`: (number) Protocolos oficialmente marcados como `ATRASADO` ou que estão `EM_ANDAMENTO` mas com a data da próxima dose no passado (atrasos em tempo real).
+   * - `ciclosCompletos`: (number) Protocolos cujo ciclo de doses já foi finalizado.
+   */
+  async buscarKpis(): Promise<Object> {
+    const hoje = new Date();
+
+    const [totalAplicadas, totalAgendados, totalAtrasado, totalCompleto] =
+      await Promise.all([
+        // KPI 1: Doses Aplicadas
+        // Simplesmente conta todos os registros na tabela de aplicações de vacina.
+        this.prisma.aplicacaoVacina.count(),
+
+        // KPI 2: Agendados
+        // Conta protocolos que ainda não terminaram E cuja próxima dose é hoje ou em uma data futura.
+        this.prisma.protocoloVacinal.count({
+          where: {
+            status: { in: [StatusCiclo.EM_ANDAMENTO, StatusCiclo.PENDENTE] },
+            dataProximaVacina: { gte: hoje },
+          },
+        }),
+
+        // KPI 3: Atrasados
+        // Conta duas categorias de atraso em tempo real:
+        // 1. Os que o Cron Job já marcou oficialmente como ATRASADO.
+        // 2. Os que ainda estão EM_ANDAMENTO, mas a data da próxima dose já passou hoje.
+        this.prisma.protocoloVacinal.count({
+          where: {
+            OR: [
+              {
+                status: StatusCiclo.ATRASADO,
+              },
+              {
+                status: StatusCiclo.EM_ANDAMENTO,
+                dataProximaVacina: { lt: hoje },
+              },
+            ],
+          },
+        }),
+
+        // KPI 4: Ciclos Completos
+        // Conta todos os protocolos que já foram finalizados.
+        this.prisma.protocoloVacinal.count({
+          where: { status: StatusCiclo.COMPLETO },
+        }),
+      ]);
+    const data = {
+      aplicado: totalAplicadas,
+      agendados: totalAgendados,
+      atrasados: totalAtrasado,
+      ciclosCompletos: totalCompleto,
+    };
+
+    return data;
+  }
+
+  /**
    * Cria uma nova vacina no catálogo do sistema.
    * @param {CreateVacinaDto} createVacinaDto - Objeto com os dados da nova vacina (ex: nome).
    * @returns {Promise<Vacinas>} O objeto da vacina recém-criada.
@@ -336,7 +403,7 @@ export class VacinasService {
    * A execução e os resultados são registrados no console.
    * @returns {Promise<void>}
    */
-  @Cron(CronExpression.EVERY_DAY_AT_2AM, {
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, {
     name: 'verificarProtocolosAtrasados',
     timeZone: 'America/Sao_Paulo',
   })

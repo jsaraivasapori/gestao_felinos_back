@@ -46,6 +46,10 @@ export class VacinasController {
   buscarUltimasAplicacoes() {
     return this.vacinasService.BuscarUltimas5Aplicacoes();
   }
+  @Get('kpis')
+  buscarKpis() {
+    return this.vacinasService.buscarKpis();
+  }
 
   //==========================================================================================
   // Controladores para Vacinas. Criar, mostrar e editar cadastro de vacinas no sistema
