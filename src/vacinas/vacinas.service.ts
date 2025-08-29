@@ -200,7 +200,7 @@ export class VacinasService {
           },
         ],
       },
-      include: { felino: true, vacina: true },
+      include: { felino: true, vacina: true, aplicacoes: true },
     });
   }
 
@@ -250,7 +250,7 @@ export class VacinasService {
           },
         ],
       },
-      include: { felino: true, vacina: true },
+      include: { felino: true, vacina: true, aplicacoes: true },
     });
 
     agendamentos.sort((a, b) => {
