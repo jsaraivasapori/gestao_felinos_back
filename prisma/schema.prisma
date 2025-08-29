@@ -61,6 +61,7 @@ model ProtocoloVacinal {
   dosesNecessarias          Int               @db.SmallInt // Ex: 3 (dose inicial + 2 reforços)
   intervaloEntreDosesEmDias Int               @db.SmallInt // Ex: 21 (dias)
   status                    StatusCiclo
+  ativo                     Boolean           @default(true)
   dataProximaVacina         DateTime?
   requerReforcoAnual        Boolean
   dataLembreteProximoCiclo  DateTime?
@@ -70,7 +71,7 @@ model ProtocoloVacinal {
   aplicacoes                AplicacaoVacina[] // Um protocolo é composto por uma ou mais aplicações (doses)
 
   // Garante que só existe um protocolo por felino/vacina.
-  @@unique([felinoId, vacinaId])
+  @@unique([felinoId, vacinaId, ativo])
 }
 
 // Models Voluntarios e Usuarios permanecem os mesmos

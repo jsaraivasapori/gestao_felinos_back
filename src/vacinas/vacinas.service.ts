@@ -40,25 +40,31 @@ export class VacinasService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Registra a aplicação de uma dose de vacina para um felino, gerenciando todo o ciclo de vida
-   * do protocolo de vacinação.
+   * Registra a aplicação de uma dose de vacina, gerenciando de forma inteligente o ciclo de vida
+   * dos protocolos, incluindo a criação de novos ciclos para reforços.
    *
    * @description
-   * Este método lida de forma inteligente tanto com a primeira dose quanto com as doses subsequentes.
-   * Ele utiliza uma transação de banco de dados para garantir a consistência dos dados.
-   * A lógica inclui: criar um protocolo se for a primeira dose, adicionar a aplicação,
-   * atualizar o status do ciclo (`EM_ANDAMENTO`, `COMPLETO`) e agendar lembretes anuais.
+   * Este método é o coração da lógica de vacinação. Ele lida com todos os cenários:
+   * 1.  **Primeira Dose:** Cria um novo protocolo de vacinação ativo.
+   * 2.  **Dose Subsequente:** Encontra o protocolo ativo e adiciona uma nova aplicação, atualizando o status.
+   * 3.  **Novo Ciclo (Reforço):** Se um protocolo ativo para a mesma vacina/felino já estiver 'COMPLETO'
+   * e permitir reforços, ele "arquiva" o protocolo antigo (marcando-o como `ativo: false`) e
+   * cria um novo ciclo, registrando a primeira dose nele.
+   * 4.  **Bloqueio:** Se um ciclo estiver 'COMPLETO' e não permitir reforços, a operação é bloqueada.
+   *
+   * Toda a sequência é executada dentro de uma transação para garantir a integridade dos dados.
    *
    * @param {RegistrarVacinacaoDto} dto - Objeto com todos os dados necessários para o registro.
-   * @returns {Promise<ProtocoloVacinal & { aplicacoes: AplicacaoVacina[] }>} O protocolo completo e
-   * atualizado, incluindo a lista de todas as doses aplicadas.
+   * @returns {Promise<ProtocoloVacinal & { aplicacoes: AplicacaoVacina[] }>} O protocolo ATIVO completo e
+   * atualizado, incluindo a lista de todas as doses aplicadas nele.
    * @throws {NotFoundException} Se o felino ou a vacina com os IDs fornecidos não forem encontrados.
+   * @throws {BadRequestException} Se for tentado adicionar uma dose a um ciclo já completo que não permite reforços.
    */
   async registrar(
     dto: RegistrarVacinacaoDto,
   ): Promise<ProtocoloVacinal & { aplicacoes: AplicacaoVacina[] }> {
     return this.prisma.$transaction(async (tx) => {
-      // 1. Verificações de existência
+      // --- PASSO 1: Validações Iniciais ---
       const felino = await tx.felinos.findUnique({
         where: { id: dto.felinoId },
       });
@@ -76,65 +82,78 @@ export class VacinasService {
         );
       }
 
-      // --- INÍCIO DA CORREÇÃO ---
-      // 2. Busca prévia para validar o estado do protocolo antes de qualquer ação
-      const protocoloExistente = await tx.protocoloVacinal.findUnique({
+      // --- PASSO 2: Busca pelo protocolo ATIVO existente ---
+      let protocoloAtivo = await tx.protocoloVacinal.findUnique({
         where: {
-          felinoId_vacinaId: { felinoId: dto.felinoId, vacinaId: dto.vacinaId },
+          // Usa a nova chave única que inclui o campo 'ativo'
+          felinoId_vacinaId_ativo: {
+            felinoId: dto.felinoId,
+            vacinaId: dto.vacinaId,
+            ativo: true,
+          },
         },
       });
 
-      // Se um protocolo já existe, aplicamos a regra de negócio
-      if (protocoloExistente) {
-        // REGRA: Não permitir adicionar dose a um ciclo já completo.
-        if (protocoloExistente.status === StatusCiclo.COMPLETO) {
-          throw new BadRequestException(
-            `O ciclo de vacinação para "${vacina.nome}" do felino "${felino.nome}" já está completo.`,
-          );
+      // --- PASSO 3: Lógica de Negócio para Protocolos Existentes ---
+      if (protocoloAtivo) {
+        // Se o protocolo ativo já está completo, decidimos o que fazer.
+        if (protocoloAtivo.status === StatusCiclo.COMPLETO) {
+          if (protocoloAtivo.requerReforcoAnual) {
+            // Se permite reforço, "arquivamos" o protocolo antigo para criar um novo.
+            await tx.protocoloVacinal.update({
+              where: { id: protocoloAtivo.id },
+              data: { ativo: false },
+            });
+            protocoloAtivo = null; // Força a criação de um novo protocolo no passo seguinte.
+          } else {
+            // Se não permite reforço, bloqueamos a operação.
+            throw new BadRequestException(
+              `O ciclo de vacinação para "${vacina.nome}" do felino "${felino.nome}" já está completo e não requer reforços.`,
+            );
+          }
         }
       }
-      // --- FIM DA CORREÇÃO ---
 
-      // 3. Encontra ou Cria o Protocolo Vacinal com segurança
-      const protocolo = await tx.protocoloVacinal.upsert({
-        where: {
-          felinoId_vacinaId: { felinoId: dto.felinoId, vacinaId: dto.vacinaId },
-        },
-        update: {},
-        create: {
-          felinoId: dto.felinoId,
-          vacinaId: dto.vacinaId,
-          dosesNecessarias: dto.dosesNecessarias,
-          intervaloEntreDosesEmDias: dto.intervaloEntreDosesEmDias,
-          requerReforcoAnual: dto.requerReforcoAnual,
-          status: StatusCiclo.PENDENTE,
-        },
-      });
+      // --- PASSO 4: Cria um Novo Protocolo se Necessário ---
+      // Isso acontece se for a primeira vez ou se o ciclo anterior foi arquivado.
+      if (!protocoloAtivo) {
+        protocoloAtivo = await tx.protocoloVacinal.create({
+          data: {
+            felinoId: dto.felinoId,
+            vacinaId: dto.vacinaId,
+            dosesNecessarias: dto.dosesNecessarias,
+            intervaloEntreDosesEmDias: dto.intervaloEntreDosesEmDias,
+            requerReforcoAnual: dto.requerReforcoAnual,
+            status: StatusCiclo.PENDENTE,
+            ativo: true, // Garante que o novo protocolo seja o ativo.
+          },
+        });
+      }
 
-      // 4. Cria o registro da aplicação da dose
+      // --- PASSO 5: Cria o Registro da Dose no Protocolo Ativo ---
       await tx.aplicacaoVacina.create({
         data: {
           laboratorio: dto.laboratorio,
           lote: dto.lote,
           medVet: dto.medVet,
-          protocoloVacinalId: protocolo.id,
+          protocoloVacinalId: protocoloAtivo.id,
           valorPago: dto.valorPago,
         },
       });
 
-      // 5. Atualiza o Status do Protocolo
+      // --- PASSO 6: Atualiza o Status do Protocolo Ativo ---
       const dosesAplicadas = await tx.aplicacaoVacina.count({
-        where: { protocoloVacinalId: protocolo.id },
+        where: { protocoloVacinalId: protocoloAtivo.id },
       });
 
       let novoStatus: StatusCiclo = StatusCiclo.EM_ANDAMENTO;
       let proximaData: Date | null = new Date();
       let dataLembreteProximoCiclo: Date | null = null;
 
-      if (dosesAplicadas >= protocolo.dosesNecessarias) {
+      if (dosesAplicadas >= protocoloAtivo.dosesNecessarias) {
         novoStatus = StatusCiclo.COMPLETO;
         proximaData = null;
-        if (protocolo.requerReforcoAnual) {
+        if (protocoloAtivo.requerReforcoAnual) {
           dataLembreteProximoCiclo = new Date();
           dataLembreteProximoCiclo.setFullYear(
             dataLembreteProximoCiclo.getFullYear() + 1,
@@ -142,12 +161,12 @@ export class VacinasService {
         }
       } else {
         proximaData.setDate(
-          proximaData.getDate() + protocolo.intervaloEntreDosesEmDias,
+          proximaData.getDate() + protocoloAtivo.intervaloEntreDosesEmDias,
         );
       }
 
       const protocoloAtualizado = await tx.protocoloVacinal.update({
-        where: { id: protocolo.id },
+        where: { id: protocoloAtivo.id },
         data: {
           status: novoStatus,
           dataProximaVacina: proximaData,
